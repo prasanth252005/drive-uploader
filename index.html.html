@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Upload to Google Drive</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #4facfe, #00f2fe);
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+      width: 90%;
+      max-width: 500px;
+      text-align: center;
+      transition: transform 0.3s ease;
+    }
+
+    .container:hover {
+      transform: scale(1.02);
+    }
+
+    input[type="file"], button {
+      margin-top: 15px;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #0077ff;
+      color: white;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+
+    button:hover {
+      background-color: #005ecc;
+    }
+
+    #gallery {
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 30px;
+      gap: 15px;
+      justify-content: center;
+    }
+
+    .image-box {
+      width: 120px;
+      height: 120px;
+      border-radius: 12px;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(30px);
+      animation: slideIn 0.6s ease forwards;
+    }
+
+    .image-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    @keyframes slideIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📤 Upload File to Google Drive</h1>
+
+  <div class="container">
+    <input type="file" id="fileInput" /><br />
+    <button onclick="handleAuth()">🔐 Connect to Google</button>
+    <button onclick="uploadFile()">⬆️ Upload File</button>
+    <p id="status"></p>
+  </div>
+
+  <div id="gallery"></div>
+
+  <script>
+    let tokenClient;
+    let accessToken = null;
+
+    const CLIENT_ID = '87746633098-qncbq1hnslb223v1hqb80be3lkb7vtg9.apps.googleusercontent.com';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+    function handleAuth() {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: (tokenResponse) => {
+          accessToken = tokenResponse.access_token;
+          document.getElementById("status").innerText = "✅ Connected to Google!";
+        },
+      });
+      tokenClient.requestAccessToken();
+    }
+
+    function uploadFile() {
+      if (!accessToken) {
+        alert("Please connect to Google first.");
+        return;
+      }
+
+      const fileInput = document.getElementById("fileInput");
+      const file = fileInput.files[0];
+
+      if (!file) {
+        alert("Please choose a file.");
+        return;
+      }
+
+      const metadata = {
+        name: file.name,
+        mimeType: file.type,
+      };
+
+      const form = new FormData();
+      form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+      form.append("file", file);
+
+      fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+        method: "POST",
+        headers: new Headers({ Authorization: "Bearer " + accessToken }),
+        body: form,
+      })
+      .then(res => res.json())
+      .then(response => {
+        document.getElementById("status").innerText = "✅ File uploaded!";
+        if (file.type.startsWith("image/")) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const imgBox = document.createElement("div");
+            imgBox.className = "image-box";
+            imgBox.innerHTML = `<img src="${e.target.result}" alt="Uploaded image" />`;
+            document.getElementById("gallery").prepend(imgBox);
+          };
+          reader.readAsDataURL(file);
+        }
+      })
+      .catch(error => {
+        console.error(error);
+        document.getElementById("status").innerText = "❌ Upload failed!";
+      });
+    }
+  </script>
+
+  <!-- Load Google API -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+</body>
+</html>
